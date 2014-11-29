@@ -49,6 +49,7 @@ class SNICClass {
     int snicInit(snicInitResponse_t * response, unsigned long timeout = 0);
     int snicSendFromSocket(uint8_t socketId, uint16_t payloadLength, uint8_t *payload, uint8_t option, uint16_t *numberOfBytes, unsigned long timeout = 0);
     int snicCloseSocket(uint8_t socketId, unsigned long timeout = 0);
+    int snicSocketPartialClose(uint8_t socketId, uint8_t direction, unsigned long timeout = 0);
     int snicGetDhcpInfo(uint8_t interface, snicGetDhcpInfoResponse_t *response, unsigned long timeout = 0);
     int snicResolveName(uint8_t interface, char *hostname, uint8_t *ipAddress, unsigned long timeout = 0);
     int snicIpConfig(uint8_t interface, unsigned long timeout = 0);
@@ -66,9 +67,10 @@ class SNICClass {
     int socketGetStatus(uint8_t socketId);
     int socketSetStatus(uint8_t socketId, uint8_t status);
     int socketAvailable(uint8_t socketId);
-    int socketReadChar(uint8_t socketId);
+    int socketReadChar(uint8_t socketId, uint8_t peek = 0);
     int socketWriteChar(uint8_t socketId, uint8_t c);
     int socketsWritable();
+    int socketFlush(uint8_t socketId);
     
     void uartHandler();
 

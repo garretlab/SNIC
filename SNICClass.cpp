@@ -152,6 +152,26 @@ int SNICClass::snicCloseSocket(uint8_t socketId, unsigned long timeout) {
 
   sendRequest(SNIC_CMD_ID_SNIC, SNIC_CLOSE_SOCKET_REQ, sizeof(sendBuffer.frame.snicCloseSocket));
   if (waitFor(SNIC_CMD_ID_SNIC, SNIC_CLOSE_SOCKET_REQ, timeout) == 0) {
+    for (int i = 0; i < SNIC_MAX_SOCKET_NUM; i++) {
+      if (socket[i].socketId == socketId) {
+        socket[i].socketId = -1;
+        socket[i].protocol = SNIC_SOCKET_PROTOCOL_TCP;
+        socket[i].status = SNIC_SOCKET_STATUS_NONEXIST;
+        socket[i].head = socket[i].tail = 0;
+      }
+    }
+    return commandReturn.status;
+  } else {
+    return SNIC_COMMAND_ERROR;
+  }
+}
+
+int SNICClass::snicSocketPartialClose(uint8_t socketId, uint8_t direction, unsigned long timeout) {
+  sendBuffer.frame.snicSocketPartialClose.socketId = socketId;
+  sendBuffer.frame.snicSocketPartialClose.direction = direction;
+
+  sendRequest(SNIC_CMD_ID_SNIC, SNIC_SOCKET_PARTIAL_CLOSE_REQ, sizeof(sendBuffer.frame.snicSocketPartialClose));
+  if (waitFor(SNIC_CMD_ID_SNIC, SNIC_SOCKET_PARTIAL_CLOSE_REQ, timeout) == 0) {
     return commandReturn.status;
   } else {
     return SNIC_COMMAND_ERROR;
@@ -255,6 +275,7 @@ int SNICClass::snicTcpConnectToServer(uint8_t socketId, uint8_t *server, uint16_
 
 void SNICClass::snicTcpConnectionStatus() {
   uint8_t socketId = receiveBuffer[7];
+  
   switch (receiveBuffer[6]) {
     case SNIC_CONNECTION_UP:
       socketSetStatus(socketId, SNIC_SOCKET_STATUS_CONNECTED);
@@ -450,17 +471,19 @@ int SNICClass::socketAvailable(uint8_t socketId) {
   return SNIC_COMMAND_ERROR;
 }
 
-int SNICClass::socketReadChar(uint8_t socketId) {
+int SNICClass::socketReadChar(uint8_t socketId, uint8_t peek) {
   for (int i = 0; i < SNIC_MAX_SOCKET_NUM; i++) {
     if ((socket[i].socketId == socketId) && (socket[i].status == SNIC_SOCKET_STATUS_CONNECTED)) {
       if (socket[i].head == socket[i].tail) {
         return SNIC_COMMAND_ERROR;
       } else {
         uint8_t c = socket[i].buffer[socket[i].tail];
-        socket[i].tail = (socket[i].tail + 1) % SNIC_SOCKET_BUFFER_SIZE;
-        if ((needAck == 1) && socketsWritable()) {
-          needAck = 0;
-          ack();
+        if (!peek) {
+          socket[i].tail = (socket[i].tail + 1) % SNIC_SOCKET_BUFFER_SIZE;
+          if ((needAck == 1) && socketsWritable()) {
+            needAck = 0;
+            ack();
+          }
         }
         return c;
       }
@@ -485,6 +508,17 @@ int SNICClass::socketWriteChar(uint8_t socketId, uint8_t c) {
   }
   return SNIC_COMMAND_ERROR;
 }
+
+int SNICClass::socketFlush(uint8_t socketId) {
+  for (int i = 0; i < SNIC_MAX_SOCKET_NUM; i++) {
+    if ((socket[i].socketId == socketId) && (socket[i].status == SNIC_SOCKET_STATUS_CONNECTED)) {
+      socket[i].head = socket[i].tail = 0;
+      return 0;
+    }
+  }
+  return SNIC_COMMAND_ERROR;
+}
+
 
 int SNICClass::socketsWritable() {
   for (int i = 0; i < SNIC_MAX_SOCKET_NUM; i++) {

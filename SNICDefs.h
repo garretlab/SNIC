@@ -45,6 +45,7 @@
 #define SNIC_INIT_REQ                      0x00    // SNIC API initialization
 #define SNIC_SEND_FROM_SOCKET_REQ          0x02    // Send from socket
 #define SNIC_CLOSE_SOCKET_REQ              0x03    // Close socket
+#define SNIC_SOCKET_PARTIAL_CLOSE_REQ      0x04    // Socket partial close
 #define SNIC_GET_DHCP_INFO_REQ             0x09    // Get DHCP info
 #define SNIC_RESOLVE_NAME_REQ              0x0a    // Resolve a host name to IP address
 #define SNIC_IP_CONFIG_REQ                 0x0b    // Configure DHCP or static IP
@@ -96,9 +97,23 @@
 
 #define SNIC_SOCKET_STATUS_NONEXIST           0x00
 #define SNIC_SOCKET_STATUS_CREATED            0x01
-#define SNIC_SOCKET_STATUS_CLOSED             0x02
-#define SNIC_SOCKET_STATUS_CONNECTION_PENDING 0x03
-#define SNIC_SOCKET_STATUS_CONNECTED          0x04
+#define SNIC_SOCKET_STATUS_PARTILLIY_CLOSED   0x02
+#define SNIC_SOCKET_STATUS_CLOSED             0x03
+#define SNIC_SOCKET_STATUS_CONNECTION_PENDING 0x04
+#define SNIC_SOCKET_STATUS_CONNECTED          0x05
+
+#define SNIC_SOCKET_STATUS_CLOSED         0x01
+#define SNIC_SOCKET_STATUS_LISTEN         0x02
+#define SNIC_SOCKET_STATUS_SENT           0x03
+#define SNIC_SOCKET_STATUS_RECEIVED       0x04
+#define SNIC_SOCKET_STATUS_ESTABLISHTED   0x05
+#define SNIC_SOCKET_STATUS_CLOSE_WAIT     0x06
+#define SNIC_SOCKET_STATUS_LAST_ACK       0x07
+#define SNIC_SOCKET_STATUS_FIN_WAIT1      0x08
+#define SNIC_SOCKET_STATUS_CLOSING        0x09
+#define SNIC_SOCKET_STATUS_FIN_WAIT2      0x0a
+#define SNIC_SOCKET_STATUS_TIME_WAIT      0x0b
+
 
 #define SNIC_SOCKET_PROTOCOL_TCP 0x01
 #define SNIC_SOCKET_PROTOCOL_UDP 0x02
@@ -129,6 +144,10 @@ typedef union {
       struct {
         uint8_t socketId;
       } snicCloseSocket;
+      struct {
+        uint8_t socketId;
+        uint8_t direction;
+      } snicSocketPartialClose;
       struct {
         uint8_t interface;
       } snicGetDhcpInfo;

@@ -46,10 +46,57 @@ size_t SNICEthernetClient::write(const uint8_t *buf, size_t size) {
 }
 
 int SNICEthernetClient::available() {
-  return SNIC.socketAvailable(socketId);
+  int n = SNIC.socketAvailable(socketId);
+  
+  if (n > 0) {
+    return n;
+  } else {
+    return 0;
+  }
 }
 
 int SNICEthernetClient::read() {
   SNIC.socketReadChar(socketId);
 }
 
+int SNICEthernetClient::read(uint8_t *buf, size_t size) {
+  int i;
+  for (i = 0; i < size; i++) {
+    uint8_t c = SNIC.socketReadChar(socketId);
+    if (c > 0) {
+      buf[i] = c;
+    } else {
+      break;
+    }
+  }
+  return i;
+}
+
+int SNICEthernetClient::peek() {
+  SNIC.socketReadChar(socketId, 1);
+}
+
+void SNICEthernetClient::flush() {
+  SNIC.socketFlush(socketId);
+}
+
+void SNICEthernetClient::stop() {
+  SNIC.snicSocketPartialClose(socketId, 2);
+  SNIC.snicCloseSocket(socketId);
+}
+
+uint8_t SNICEthernetClient::connected() {
+  if (SNIC.socketGetStatus(socketId) == SNIC_SOCKET_STATUS_CONNECTED) {
+    return 1;
+  } else {
+    return 0;
+  }
+}
+
+SNICEthernetClient::operator bool() {
+  return socketId != -1;
+}
+
+bool SNICEthernetClient::operator==(const SNICEthernetClient& rhs) {
+  return socketId == rhs.socketId && socketId != -1 && rhs.socketId != -1;
+}

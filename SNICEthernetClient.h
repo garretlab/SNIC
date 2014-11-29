@@ -6,20 +6,20 @@
 
 class SNICEthernetClient : public Client {
   public:
-    SNICEthernetClient();
+    SNICEthernetClient();                                    // done
 
-    virtual int connect(IPAddress ip, uint16_t port);
-    virtual int connect(const char *host, uint16_t port);
-    virtual size_t write(uint8_t);
-    virtual size_t write(const uint8_t *buf, size_t size);
-    virtual int available();
-    virtual int read();
-    virtual int read(uint8_t *buf, size_t size);
-    virtual int peek();
-    virtual void flush();
-    virtual void stop();
-    virtual uint8_t connected();
-    virtual operator bool();
+    virtual int connect(IPAddress ip, uint16_t port);        // done
+    virtual int connect(const char *host, uint16_t port);    // done
+    virtual size_t write(uint8_t);                           // done
+    virtual size_t write(const uint8_t *buf, size_t size);   // done
+    virtual int available();                                 // done
+    virtual int read();                                      // done
+    virtual int read(uint8_t *buf, size_t size);             // done
+    virtual int peek();                                      // done
+    virtual void flush();                                    // done
+    virtual void stop();                                     // done
+    virtual uint8_t connected();                             // done
+    virtual operator bool();                                 // done
     virtual bool operator==(const SNICEthernetClient&);
     virtual bool operator!=(const SNICEthernetClient& rhs) {
       return !this->operator==(rhs);
