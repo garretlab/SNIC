@@ -64,6 +64,8 @@ class SNICClass {
     int ack();
 
     // Socket Operation Functions
+    int socketReset(uint8_t socketId);
+    int socketInitialize(uint8_t socketId, uint8_t status, uint8_t protocol);
     int socketGetStatus(uint8_t socketId);
     int socketSetStatus(uint8_t socketId, uint8_t status);
     int socketAvailable(uint8_t socketId);

@@ -87,10 +87,10 @@
 #define SNIC_MAX_UDP_SOCKET_NUM 4
 #define SNIC_MAX_SOCKET_NUM (SNIC_MAX_TCP_SOCKET_NUM + SNIC_MAX_UDP_SOCKET_NUM)
 
-#define SNIC_UART_FRAME_BUFFER_SIZE     128  // Buffer to keep data to snic.
-#define SNIC_RECEIVE_BUFFER_SIZE        128  // Buffer to keep data from snic.
+#define SNIC_SEND_BUFFER_SIZE           128  // Buffer to keep data to snic.
+#define SNIC_RECEIVE_BUFFER_SIZE        128  // Buffer to keep data from snic for each socket.
 #define SNIC_COMMAND_RETURN_BUFFER_SIZE 128  // Buffer to keep data from snic.
-#define SNIC_SOCKET_BUFFER_SIZE         128  // Buffer to keep received data for each socket.
+#define SNIC_SOCKET_BUFFER_SIZE          64  // Buffer to keep received data for each socket.
 
 #define SNIC_COMMAND_RECEIVING 0
 #define SNIC_COMMNAD_RECEIVIED 1
@@ -118,10 +118,11 @@
 #define SNIC_SOCKET_PROTOCOL_TCP 0x01
 #define SNIC_SOCKET_PROTOCOL_UDP 0x02
 
-#define SNIC_COMMAND_ERROR -1
+#define SNIC_COMMAND_SUCCESS  0
+#define SNIC_COMMAND_ERROR   -1
 
 typedef union {
-  uint8_t data[SNIC_UART_FRAME_BUFFER_SIZE];
+  uint8_t data[SNIC_SEND_BUFFER_SIZE];
   struct {
     uint8_t som;
     uint8_t length[2];
@@ -139,7 +140,7 @@ typedef union {
         uint8_t socketId;
         uint8_t option;
         uint8_t payloadLength[2];
-        uint8_t payload[SNIC_UART_FRAME_BUFFER_SIZE - 10];
+        uint8_t payload[SNIC_SEND_BUFFER_SIZE - 10];
       } snicSendFromSocket;
       struct {
         uint8_t socketId;
@@ -182,7 +183,7 @@ typedef union {
         uint8_t retryTimes;
       } snicDataIndAckConfig;
       struct {
-        uint8_t buffer[SNIC_UART_FRAME_BUFFER_SIZE - 6];
+        uint8_t buffer[SNIC_SEND_BUFFER_SIZE - 6];
       } general;
     };
   } frame;
