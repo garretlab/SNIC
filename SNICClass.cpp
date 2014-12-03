@@ -208,6 +208,50 @@ int SNICClass::snicResolveName(uint8_t interface, char * hostname, uint8_t * ipA
   }
 }
 
+int SNICClass::snicIpConfig(uint8_t interface, unsigned long timeout) {
+  sendBuffer.frame.snicIpConfig.interface = interface;
+  sendBuffer.frame.snicIpConfig.dhcp = 1;
+
+  sendRequest(SNIC_CMD_ID_SNIC, SNIC_IP_CONFIG_REQ, 2);
+  if (waitFor(SNIC_CMD_ID_SNIC, SNIC_IP_CONFIG_REQ, timeout) == 0) {
+    return commandReturn.status;
+  } else {
+    return SNIC_COMMAND_ERROR;
+  }
+}
+
+int SNICClass::snicIpConfig(uint8_t interface, uint8_t * localhost, uint8_t * netmask, uint8_t * gateway, unsigned long timeout) {
+  sendBuffer.frame.snicIpConfig.interface = interface;
+  sendBuffer.frame.snicIpConfig.dhcp = 0;
+  for (int i = 0; i < 4; i++) {
+    sendBuffer.frame.snicIpConfig.localhost[i] = localhost[i];
+    sendBuffer.frame.snicIpConfig.netmask[i] = netmask[i];
+    sendBuffer.frame.snicIpConfig.gateway[i] = gateway[i];
+  }
+
+  sendRequest(SNIC_CMD_ID_SNIC, SNIC_IP_CONFIG_REQ, sizeof(sendBuffer.frame.snicIpConfig));
+  if (waitFor(SNIC_CMD_ID_SNIC, SNIC_IP_CONFIG_REQ, timeout) == 0) {
+    return commandReturn.status;
+  } else {
+    return SNIC_COMMAND_ERROR;
+  }
+}
+
+int SNICClass::snicDataIndAckConfig(uint8_t protocol, uint8_t ackEnable, uint16_t ackTimeout, uint8_t retryTimes, unsigned long timeout) {
+  sendBuffer.frame.snicDataIndAckConfig.protocol = protocol;
+  sendBuffer.frame.snicDataIndAckConfig.ackEnable = ackEnable;
+  sendBuffer.frame.snicDataIndAckConfig.ackTimeout[0] = ackTimeout >> 8;
+  sendBuffer.frame.snicDataIndAckConfig.ackTimeout[1] = ackTimeout & 0xff;
+  sendBuffer.frame.snicDataIndAckConfig.retryTimes = retryTimes;
+
+  sendRequest(SNIC_CMD_ID_SNIC, SNIC_DATA_IND_ACK_CONFIG_REQ, sizeof(sendBuffer.frame.snicDataIndAckConfig));
+  if (waitFor(SNIC_CMD_ID_SNIC, SNIC_DATA_IND_ACK_CONFIG_REQ, timeout) == 0) {
+    return (commandReturn.status);
+  } else {
+    return SNIC_COMMAND_ERROR;
+  }
+}
+
 int SNICClass::snicTcpCreateSocket(uint8_t * socketId, unsigned long timeout) {
   sendBuffer.frame.snicTcpCreateSocket.bind = 0;
 
@@ -230,6 +274,58 @@ int SNICClass::snicTcpCreateSocket(uint8_t * socketId, unsigned long timeout) {
   }
 }
 
+int SNICClass::snicTcpCreateSocket(uint16_t localPort, uint8_t *socketId, unsigned long timeout) {
+  sendBuffer.frame.snicTcpCreateSocket.bind = 1;
+  for (int i = 0; i < 4; i++) {
+    sendBuffer.frame.snicTcpCreateSocket.localIpAddress[i] = 0;
+  }
+  sendBuffer.frame.snicTcpCreateSocket.localPort[0] = localPort >> 8;
+  sendBuffer.frame.snicTcpCreateSocket.localPort[1] = localPort & 0xff;
+  
+  sendRequest(SNIC_CMD_ID_SNIC, SNIC_TCP_CREATE_SOCKET_REQ, sizeof(sendBuffer.frame.snicTcpCreateSocket));
+  if (waitFor(SNIC_CMD_ID_SNIC, SNIC_TCP_CREATE_SOCKET_REQ, timeout) == 0) {
+    if (commandReturn.status == SNIC_SUCCESS) {
+      *socketId = commandReturn.buffer[7];
+      if (socketInitialize(*socketId, SNIC_SOCKET_STATUS_CREATED, SNIC_SOCKET_PROTOCOL_TCP) == SNIC_COMMAND_SUCCESS) {
+        return SNIC_COMMAND_SUCCESS;
+      } else {
+        // command success but no slot. should never happen.
+        snicCloseSocket(*socketId);
+        return SNIC_COMMAND_ERROR;
+      }
+    } else { // command failure.
+      return commandReturn.status;
+    }
+  } else { // timeout
+    return SNIC_COMMAND_ERROR;
+  }
+}
+
+int SNICClass::snicTcpCreateConnection(uint8_t socketId, uint16_t receiveBufferSize, uint8_t maximumClientConnctions, snicTcpConnectToServerResponse_t *response, unsigned long timeout) {
+  if (socketGetStatus(socketId) != SNIC_SOCKET_STATUS_CREATED) {
+    return SNIC_COMMAND_ERROR;
+  }
+
+  sendBuffer.frame.snicTcpCreateConnection.socket = socketId;
+  sendBuffer.frame.snicTcpCreateConnection.receiveBufferSize[0] = receiveBufferSize >> 8;
+  sendBuffer.frame.snicTcpCreateConnection.receiveBufferSize[1] = receiveBufferSize & 0xff;
+  sendBuffer.frame.snicTcpCreateConnection.maximumClientConnctions = maximumClientConnctions;
+
+  sendRequest(SNIC_CMD_ID_SNIC, SNIC_TCP_CREATE_CONNECTION_REQ, sizeof(sendBuffer.frame.snicTcpCreateConnection));
+  if (waitFor(SNIC_CMD_ID_SNIC, SNIC_TCP_CREATE_CONNECTION_REQ, timeout) == 0) {
+    if (commandReturn.status == SNIC_SUCCESS) {
+      response->receiveBufferSize = commandReturn.buffer[7] << 8 | commandReturn.buffer[8];
+      response->maximumClientConnctions = commandReturn.buffer[9];
+      if (socketSetStatus(socketId, SNIC_SOCKET_STATUS_LISTEN) != SNIC_COMMAND_SUCCESS) {
+        return SNIC_COMMAND_ERROR;
+      }
+    }
+    return commandReturn.status;
+  } else {
+    return SNIC_COMMAND_ERROR;
+  }
+}
+
 int SNICClass::snicTcpConnectToServer(uint8_t socketId, uint8_t * server, uint16_t port, uint8_t connectTimeout, uint16_t * receiveBufferSize, unsigned long timeout) {
   sendBuffer.frame.snicTcpConnectToServer.socketId = socketId;
   for (int i = 0; i < 4; i++) {
@@ -238,10 +334,10 @@ int SNICClass::snicTcpConnectToServer(uint8_t socketId, uint8_t * server, uint16
   sendBuffer.frame.snicTcpConnectToServer.serverPort[0] = port >> 8;
   sendBuffer.frame.snicTcpConnectToServer.serverPort[1] = port & 0xff;
   if (SNIC_SOCKET_BUFFER_SIZE < (SNIC_RECEIVE_BUFFER_SIZE - 5)) {
-    sendBuffer.frame.snicTcpConnectToServer.receiveBufferSize[0] = ((SNIC_SOCKET_BUFFER_SIZE - 1) >> 8) & 0xff;
+    sendBuffer.frame.snicTcpConnectToServer.receiveBufferSize[0] = (SNIC_SOCKET_BUFFER_SIZE - 1) >> 8;
     sendBuffer.frame.snicTcpConnectToServer.receiveBufferSize[1] = (SNIC_SOCKET_BUFFER_SIZE - 1) & 0xff;
   } else {
-    sendBuffer.frame.snicTcpConnectToServer.receiveBufferSize[0] = ((SNIC_RECEIVE_BUFFER_SIZE - 5) >> 8) & 0xff;
+    sendBuffer.frame.snicTcpConnectToServer.receiveBufferSize[0] = (SNIC_RECEIVE_BUFFER_SIZE - 5) >> 8;
     sendBuffer.frame.snicTcpConnectToServer.receiveBufferSize[1] = (SNIC_RECEIVE_BUFFER_SIZE - 5) & 0xff;
   }
   sendBuffer.frame.snicTcpConnectToServer.connectTimeout = connectTimeout;
@@ -286,6 +382,12 @@ void SNICClass::snicTcpConnectionStatus() {
   }
 }
 
+void SNICClass::snicTcpClientSocket() {
+  uint8_t socketId = receiveBuffer[7];
+  
+  socketInitialize(socketId, SNIC_SOCKET_STATUS_CONNECTED, SNIC_SOCKET_PROTOCOL_TCP);
+}
+
 void SNICClass::snicConnectionRecv() {
   uint8_t socketId = receiveBuffer[6];
   uint16_t payloadLength = (receiveBuffer[7] << 8) | receiveBuffer[8];
@@ -298,50 +400,6 @@ void SNICClass::snicConnectionRecv() {
     ack();
   } else {
     needAck = 1;
-  }
-}
-
-int SNICClass::snicIpConfig(uint8_t interface, unsigned long timeout) {
-  sendBuffer.frame.snicIpConfig.interface = interface;
-  sendBuffer.frame.snicIpConfig.dhcp = 1;
-
-  sendRequest(SNIC_CMD_ID_SNIC, SNIC_IP_CONFIG_REQ, 2);
-  if (waitFor(SNIC_CMD_ID_SNIC, SNIC_IP_CONFIG_REQ, timeout) == 0) {
-    return commandReturn.status;
-  } else {
-    return SNIC_COMMAND_ERROR;
-  }
-}
-
-int SNICClass::snicIpConfig(uint8_t interface, uint8_t * localhost, uint8_t * netmask, uint8_t * gateway, unsigned long timeout) {
-  sendBuffer.frame.snicIpConfig.interface = interface;
-  sendBuffer.frame.snicIpConfig.dhcp = 0;
-  for (int i = 0; i < 4; i++) {
-    sendBuffer.frame.snicIpConfig.localhost[i] = localhost[i];
-    sendBuffer.frame.snicIpConfig.netmask[i] = netmask[i];
-    sendBuffer.frame.snicIpConfig.gateway[i] = gateway[i];
-  }
-
-  sendRequest(SNIC_CMD_ID_SNIC, SNIC_IP_CONFIG_REQ, sizeof(sendBuffer.frame.snicIpConfig));
-  if (waitFor(SNIC_CMD_ID_SNIC, SNIC_IP_CONFIG_REQ, timeout) == 0) {
-    return commandReturn.status;
-  } else {
-    return SNIC_COMMAND_ERROR;
-  }
-}
-
-int SNICClass::snicDataIndAckConfig(uint8_t protocol, uint8_t ackEnable, uint16_t ackTimeout, uint8_t retryTimes, unsigned long timeout) {
-  sendBuffer.frame.snicDataIndAckConfig.protocol = protocol;
-  sendBuffer.frame.snicDataIndAckConfig.ackEnable = ackEnable;
-  sendBuffer.frame.snicDataIndAckConfig.ackTimeout[0] = ackTimeout >> 8;
-  sendBuffer.frame.snicDataIndAckConfig.ackTimeout[1] = ackTimeout & 0xff;
-  sendBuffer.frame.snicDataIndAckConfig.retryTimes = retryTimes;
-
-  sendRequest(SNIC_CMD_ID_SNIC, SNIC_DATA_IND_ACK_CONFIG_REQ, sizeof(sendBuffer.frame.snicDataIndAckConfig));
-  if (waitFor(SNIC_CMD_ID_SNIC, SNIC_DATA_IND_ACK_CONFIG_REQ, timeout) == 0) {
-    return (commandReturn.status);
-  } else {
-    return SNIC_COMMAND_ERROR;
   }
 }
 
@@ -423,6 +481,8 @@ void SNICClass::dispatch(int length) {
     ; // ignore
   } else if (((receiveBuffer[3] & 0x7f) == SNIC_CMD_ID_SNIC) && ((receiveBuffer[4] & 0x7f) == SNIC_TCP_CONNECTION_STATUS_IND)) {
     snicTcpConnectionStatus();
+  } else if (((receiveBuffer[3] & 0x7f) == SNIC_CMD_ID_SNIC) && ((receiveBuffer[4] & 0x7f) == SNIC_TCP_CLIENT_SOCKET_IND)) {
+    snicTcpClientSocket();
   } else if (((receiveBuffer[3] & 0x7f) == SNIC_CMD_ID_SNIC) && ((receiveBuffer[4] & 0x7f) == SNIC_CONNECTION_RECV_IND)) {
     snicConnectionRecv();
   } else {
@@ -524,7 +584,6 @@ int SNICClass::socketWriteChar(uint8_t socketId, uint8_t c) {
       }
     }
   }
-
   return SNIC_COMMAND_ERROR;
 }
 

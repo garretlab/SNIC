@@ -56,8 +56,11 @@ class SNICClass {
     int snicIpConfig(uint8_t interface, uint8_t *localhost, uint8_t *netmask, uint8_t *gateway, unsigned long timeout = 0);
     int snicDataIndAckConfig(uint8_t protocol, uint8_t ackEnable, uint16_t ackTimeout, uint8_t retryTimes, unsigned long timeout = 0);
     int snicTcpCreateSocket(uint8_t *socketId, unsigned long timeout = 0);
+    int snicTcpCreateSocket(uint16_t localPort, uint8_t *socketId, unsigned long timeout = 0);
+    int snicTcpCreateConnection(uint8_t socketId, uint16_t receiveBufferSize, uint8_t maximumClientConnctions, snicTcpConnectToServerResponse_t *response, unsigned long timeout = 0);
     int snicTcpConnectToServer(uint8_t socketId, uint8_t *server, uint16_t port, uint8_t connectTimeout, uint16_t *receiveBufferSize, unsigned long timeout = 0);
     void snicTcpConnectionStatus();
+    void snicTcpClientSocket();
     void snicConnectionRecv();
     
     // ACK

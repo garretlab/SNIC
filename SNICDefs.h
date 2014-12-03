@@ -51,8 +51,10 @@
 #define SNIC_IP_CONFIG_REQ                 0x0b    // Configure DHCP or static IP
 #define SNIC_DATA_IND_ACK_CONFIG_REQ       0x0c    // ACK configuration for data indications
 #define SNIC_TCP_CREATE_SOCKET_REQ         0x10    // Create TCP socket
+#define SNIC_TCP_CREATE_CONNECTION_REQ     0x11    // Create TCP connection server
 #define SNIC_TCP_CONNECT_TO_SERVER_REQ     0x12    // Connect to TCP server
 #define SNIC_TCP_CONNECTION_STATUS_IND     0x20    // Connection status indication
+#define SNIC_TCP_CLIENT_SOCKET_IND         0x21    // TCP client socket indication
 #define SNIC_CONNECTION_RECV_IND           0x22    // TCP or connected UDP packet received indication
 
 #define GEN_PWR_UP_IND 0x00
@@ -89,7 +91,6 @@
 
 #define SNIC_SEND_BUFFER_SIZE           128  // Buffer to keep data to snic.
 #define SNIC_RECEIVE_BUFFER_SIZE        128  // Buffer to keep data from snic for each socket.
-#define SNIC_COMMAND_RETURN_BUFFER_SIZE 128  // Buffer to keep data from snic.
 #define SNIC_SOCKET_BUFFER_SIZE          64  // Buffer to keep received data for each socket.
 
 #define SNIC_COMMAND_RECEIVING 0
@@ -101,6 +102,7 @@
 #define SNIC_SOCKET_STATUS_CLOSED             0x03
 #define SNIC_SOCKET_STATUS_CONNECTION_PENDING 0x04
 #define SNIC_SOCKET_STATUS_CONNECTED          0x05
+#define SNIC_SOCKET_STATUS_LISTEN             0x06
 
 #define SNIC_SOCKET_STATUS_CLOSED         0x01
 #define SNIC_SOCKET_STATUS_LISTEN         0x02
@@ -113,7 +115,6 @@
 #define SNIC_SOCKET_STATUS_CLOSING        0x09
 #define SNIC_SOCKET_STATUS_FIN_WAIT2      0x0a
 #define SNIC_SOCKET_STATUS_TIME_WAIT      0x0b
-
 
 #define SNIC_SOCKET_PROTOCOL_TCP 0x01
 #define SNIC_SOCKET_PROTOCOL_UDP 0x02
@@ -163,6 +164,11 @@ typedef union {
         uint8_t localPort[2];
       } snicTcpCreateSocket;
       struct {
+        uint8_t socket;
+        uint8_t receiveBufferSize[2];
+        uint8_t maximumClientConnctions;
+      } snicTcpCreateConnection;
+      struct {
         uint8_t socketId;
         uint8_t serverIpAddress[4];
         uint8_t serverPort[2];
@@ -207,8 +213,13 @@ typedef struct {
   uint8_t netmask[4];
 } snicGetDhcpInfoResponse_t;
 
+typedef struct {
+  uint16_t receiveBufferSize;
+  uint8_t maximumClientConnctions;
+} snicTcpConnectToServerResponse_t;
+
 typedef union {
-  uint8_t buffer[SNIC_COMMAND_RETURN_BUFFER_SIZE];
+  uint8_t buffer[SNIC_RECEIVE_BUFFER_SIZE];
   struct {
     uint8_t som;
     uint8_t payloadLengt[2];
@@ -220,8 +231,10 @@ typedef union {
 } commandReturn_t;
 
 typedef struct {
-  int8_t socketId;
+  int socketId;
+  int parentSocketId;
   uint8_t protocol;
+  uint16_t port;
   volatile uint8_t status;
   uint8_t buffer[SNIC_SOCKET_BUFFER_SIZE];
   int head;
