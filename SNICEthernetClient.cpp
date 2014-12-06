@@ -16,7 +16,7 @@ int SNICEthernetClient::connect(IPAddress ip, uint16_t port) {
     ipAddress[i] = ip[i];
   }
 
-  if ((SNIC.snicTcpCreateSocket(&socketId)  != SNIC_SUCCESS)) {
+  if ((SNIC.snicTcpCreateSocket((uint8_t *)&socketId)  != SNIC_SUCCESS)) {
     return 0;
   }
 
@@ -98,5 +98,5 @@ SNICEthernetClient::operator bool() {
 }
 
 bool SNICEthernetClient::operator==(const SNICEthernetClient& rhs) {
-  return socketId == rhs.socketId && socketId != -1 && rhs.socketId != -1;
+  return (socketId == rhs.socketId) && (socketId != -1) && (rhs.socketId != -1);
 }

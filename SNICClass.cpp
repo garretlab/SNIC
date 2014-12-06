@@ -387,10 +387,10 @@ void SNICClass::snicTcpConnectionStatus() {
 }
 
 void SNICClass::snicTcpClientSocket() {
-  uint8_t parentSocket = receiveBuffer[6];
+  uint8_t parentSocketId = receiveBuffer[6];
   uint8_t socketId = receiveBuffer[7];
 
-  socketAllocate(socketId, parentSocket, SNIC_SOCKET_STATUS_CONNECTED, SNIC_SOCKET_PROTOCOL_TCP);
+  socketAllocate(socketId, parentSocketId, SNIC_SOCKET_STATUS_CONNECTED, SNIC_SOCKET_PROTOCOL_TCP);
 }
 
 void SNICClass::snicConnectionRecv() {
@@ -433,8 +433,10 @@ int SNICClass::accept(uint8_t listeningSocketId, uint8_t *clientSocketId) {
 int SNICClass::select(uint8_t listeningSocketId, uint8_t *clientSocketId) {
   for (int i = 0; i < SNIC_MAX_SOCKET_NUM; i++) {
     if ((socket[i].parentSocketId == listeningSocketId) && (socket[i].status == SNIC_SOCKET_STATUS_CONNECTED)) {
-      *clientSocketId = socket[i].socketId;
-      return SNIC_COMMAND_SUCCESS;
+      if (socketAvailable(socket[i].socketId)) {
+        *clientSocketId = socket[i].socketId;
+        return SNIC_COMMAND_SUCCESS;
+      }
     }
   }
   return SNIC_COMMAND_ERROR;
@@ -652,7 +654,7 @@ int SNICClass::socketsWritable() {
   for (int i = 0; i < SNIC_MAX_SOCKET_NUM; i++) {
     if (socket[i].status == SNIC_SOCKET_STATUS_CONNECTED) {
       if (SNIC_SOCKET_BUFFER_SIZE < (SNIC_RECEIVE_BUFFER_SIZE - 5)) { // socket buffer size is smaller than receive buffer size. buffer should be empty.
-        if (((SNIC_SOCKET_BUFFER_SIZE + socket[i].tail - socket[i].head) % SNIC_SOCKET_BUFFER_SIZE) < (SNIC_SOCKET_BUFFER_SIZE - 1)) {
+        if (socket[i].head != socket[i].tail) { 
           return 0;
         }
       } else { // socket buffer size if larger than receive buffer size.

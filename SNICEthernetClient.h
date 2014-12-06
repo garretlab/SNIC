@@ -29,7 +29,7 @@ class SNICEthernetClient : public Client {
 
     using Print::write;
   private:
-    uint8_t socketId;
+    int socketId;
 };
 
 #endif /* SNIC_EHTERNET_CLIENT_H */

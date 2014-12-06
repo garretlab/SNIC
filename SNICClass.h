@@ -85,6 +85,7 @@ class SNICClass {
     
     void uartHandler();
 
+    friend class SNICEthernetServer;
   private:
     Stream *serialPort;
     int resetPin;
