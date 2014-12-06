@@ -31,9 +31,7 @@ SNICClass::SNICClass() {
   sequence = 0;
   needAck = 0;
 
-  for (int i = 0; i < SNIC_MAX_SOCKET_NUM; i++) {
-    socketReset(i);
-  }
+  socketsReset();
 }
 
 void SNICClass::begin(Stream *serialPort, int resetPin) {
@@ -149,7 +147,7 @@ int SNICClass::snicCloseSocket(uint8_t socketId, unsigned long timeout) {
 
   sendRequest(SNIC_CMD_ID_SNIC, SNIC_CLOSE_SOCKET_REQ, sizeof(sendBuffer.frame.snicCloseSocket));
   if (waitFor(SNIC_CMD_ID_SNIC, SNIC_CLOSE_SOCKET_REQ, timeout) == 0) {
-    if (socketReset(socketId) == SNIC_COMMAND_SUCCESS) {
+    if (socketFree(socketId) == SNIC_COMMAND_SUCCESS) {
       return commandReturn.status;
     } else {
       return SNIC_COMMAND_ERROR;
@@ -163,7 +161,11 @@ int SNICClass::snicSocketPartialClose(uint8_t socketId, uint8_t direction, unsig
 
   sendRequest(SNIC_CMD_ID_SNIC, SNIC_SOCKET_PARTIAL_CLOSE_REQ, sizeof(sendBuffer.frame.snicSocketPartialClose));
   if (waitFor(SNIC_CMD_ID_SNIC, SNIC_SOCKET_PARTIAL_CLOSE_REQ, timeout) == 0) {
-    return commandReturn.status;
+    if (socketSetStatus(socketId, SNIC_SOCKET_STATUS_PARTILLIY_CLOSED) == 0) {
+      return commandReturn.status;
+    } else {
+      return SNIC_COMMAND_ERROR;
+    }
   } else {
     return SNIC_COMMAND_ERROR;
   }
@@ -259,7 +261,7 @@ int SNICClass::snicTcpCreateSocket(uint8_t * socketId, unsigned long timeout) {
   if (waitFor(SNIC_CMD_ID_SNIC, SNIC_TCP_CREATE_SOCKET_REQ, timeout) == 0) {
     if (commandReturn.status == SNIC_SUCCESS) {
       *socketId = commandReturn.buffer[7];
-      if (socketInitialize(*socketId, SNIC_SOCKET_STATUS_CREATED, SNIC_SOCKET_PROTOCOL_TCP) == SNIC_COMMAND_SUCCESS) {
+      if (socketAllocate(*socketId, -1, SNIC_SOCKET_STATUS_CREATED, SNIC_SOCKET_PROTOCOL_TCP) == SNIC_COMMAND_SUCCESS) {
         return SNIC_COMMAND_SUCCESS;
       } else {
         // command success but no slot. should never happen.
@@ -281,12 +283,12 @@ int SNICClass::snicTcpCreateSocket(uint16_t localPort, uint8_t *socketId, unsign
   }
   sendBuffer.frame.snicTcpCreateSocket.localPort[0] = localPort >> 8;
   sendBuffer.frame.snicTcpCreateSocket.localPort[1] = localPort & 0xff;
-  
+
   sendRequest(SNIC_CMD_ID_SNIC, SNIC_TCP_CREATE_SOCKET_REQ, sizeof(sendBuffer.frame.snicTcpCreateSocket));
   if (waitFor(SNIC_CMD_ID_SNIC, SNIC_TCP_CREATE_SOCKET_REQ, timeout) == 0) {
     if (commandReturn.status == SNIC_SUCCESS) {
       *socketId = commandReturn.buffer[7];
-      if (socketInitialize(*socketId, SNIC_SOCKET_STATUS_CREATED, SNIC_SOCKET_PROTOCOL_TCP) == SNIC_COMMAND_SUCCESS) {
+      if (socketAllocate(*socketId, -1, SNIC_SOCKET_STATUS_CREATED, SNIC_SOCKET_PROTOCOL_TCP) == SNIC_COMMAND_SUCCESS) {
         return SNIC_COMMAND_SUCCESS;
       } else {
         // command success but no slot. should never happen.
@@ -368,24 +370,27 @@ void SNICClass::snicTcpConnectionStatus() {
     case SNIC_CONNECTION_UP:
       socketSetStatus(socketId, SNIC_SOCKET_STATUS_CONNECTED);
       break;
-    case SNIC_ACCEPT_SOCKET_FAIL:
     case SNIC_SOCKET_PARTIALLY_CLOSED:
+      socketSetStatus(socketId, SNIC_SOCKET_PARTIALLY_CLOSED);
+      break;
     case SNIC_SOCKET_CLOSED:
     case SNIC_SEND_FAIL:
     case SNIC_CONNECT_TO_SERVER_FAIL:
     case SNIC_TIMEOUT:
-      socketReset(socketId);
+    case SNIC_ACCEPT_SOCKET_FAIL:
+      socketFree(socketId);
       break;
     default:
-      socketReset(socketId);
+      socketFree(socketId);
       break;
   }
 }
 
 void SNICClass::snicTcpClientSocket() {
+  uint8_t parentSocket = receiveBuffer[6];
   uint8_t socketId = receiveBuffer[7];
-  
-  socketInitialize(socketId, SNIC_SOCKET_STATUS_CONNECTED, SNIC_SOCKET_PROTOCOL_TCP);
+
+  socketAllocate(socketId, parentSocket, SNIC_SOCKET_STATUS_CONNECTED, SNIC_SOCKET_PROTOCOL_TCP);
 }
 
 void SNICClass::snicConnectionRecv() {
@@ -414,6 +419,18 @@ int SNICClass::ack() {
   serialPort->write(0xff);
   serialPort->write(0x04);
 }
+
+int SNICClass::accept(uint8_t listeningSocketId, uint8_t *clientSocketId) {
+  for (int i = 0; i < SNIC_MAX_SOCKET_NUM; i++) {
+    if ((socket[i].parentSocketId == listeningSocketId) && (socket[i].status == SNIC_SOCKET_STATUS_CONNECTED)) {
+      socket[i].parentSocketId = -1;
+      *clientSocketId = socket[i].socketId;
+      return SNIC_COMMAND_SUCCESS;
+    }
+  }
+  return SNIC_COMMAND_ERROR;
+}
+
 
 int SNICClass::sendRequest(uint8_t commandId, uint8_t subCommandId, uint16_t dataLength) {
   uint8_t checksum = 0;
@@ -494,23 +511,23 @@ void SNICClass::dispatch(int length) {
   }
 }
 
-int SNICClass::socketReset(uint8_t socketId) {
+int SNICClass::socketsReset() {
   for (int i = 0; i < SNIC_MAX_SOCKET_NUM; i++) {
-    if (socket[i].socketId == socketId) {
-      socket[i].socketId = -1;
-      socket[i].protocol = SNIC_SOCKET_PROTOCOL_TCP;
-      socket[i].status = SNIC_SOCKET_STATUS_NONEXIST;
-      socket[i].head = socket[i].tail = 0;
-      return SNIC_COMMAND_SUCCESS;
-    }
+    socket[i].socketId = -1;
+    socket[i].parentSocketId = -1;
+    socket[i].protocol = SNIC_SOCKET_PROTOCOL_TCP;
+    socket[i].status = SNIC_SOCKET_STATUS_NONEXIST;
+    socket[i].head = socket[i].tail = 0;
   }
-  return SNIC_COMMAND_ERROR;
+  return SNIC_COMMAND_SUCCESS;
 }
 
-int SNICClass::socketInitialize(uint8_t socketId, uint8_t status, uint8_t protocol) {
+// Allocate a new socket structure for specified socketId
+int SNICClass::socketAllocate(int socketId, int parentSocketId, uint8_t status, uint8_t protocol) {
   for (int i = 0; i < SNIC_MAX_SOCKET_NUM; i++) {
     if (socket[i].status == SNIC_SOCKET_STATUS_NONEXIST) {
       socket[i].socketId = socketId;
+      socket[i].parentSocketId = parentSocketId;
       socket[i].protocol = protocol;
       socket[i].status = status;
       socket[i].head = socket[i].tail = 0;
@@ -520,7 +537,34 @@ int SNICClass::socketInitialize(uint8_t socketId, uint8_t status, uint8_t protoc
   return SNIC_COMMAND_ERROR;
 }
 
-int SNICClass::socketGetStatus(uint8_t socketId) {
+int SNICClass::socketFree(int socketId) {
+  for (int i = 0; i < SNIC_MAX_SOCKET_NUM; i++) {
+    if (socket[i].socketId == socketId) {
+      socket[i].socketId = -1;
+      socket[i].parentSocketId = -1;
+      socket[i].protocol = SNIC_SOCKET_PROTOCOL_TCP;
+      socket[i].status = SNIC_SOCKET_STATUS_NONEXIST;
+      socket[i].head = socket[i].tail = 0;
+      return SNIC_COMMAND_SUCCESS;
+    }
+  }
+  return SNIC_COMMAND_ERROR;
+}
+
+int SNICClass::socketSetInformation(int socketId, int parentSocketId, uint8_t status, uint8_t protocol) {
+  for (int i = 0; i < SNIC_MAX_SOCKET_NUM; i++) {
+    if (socket[i].socketId == socketId) {
+      socket[i].parentSocketId = parentSocketId;
+      socket[i].protocol = protocol;
+      socket[i].status = status;
+      socket[i].head = socket[i].tail = 0;
+      return SNIC_COMMAND_SUCCESS;
+    }
+  }
+  return SNIC_COMMAND_ERROR;
+}
+
+int SNICClass::socketGetStatus(int socketId) {
   for (int i = 0; i < SNIC_MAX_SOCKET_NUM; i++) {
     if (socket[i].socketId == socketId) {
       return socket[i].status;
@@ -529,7 +573,7 @@ int SNICClass::socketGetStatus(uint8_t socketId) {
   return SNIC_COMMAND_ERROR;
 }
 
-int SNICClass::socketSetStatus(uint8_t socketId, uint8_t status) {
+int SNICClass::socketSetStatus(int socketId, uint8_t status) {
   for (int i = 0; i < SNIC_MAX_SOCKET_NUM; i++) {
     if (socket[i].socketId == socketId) {
       socket[i].status = status;
@@ -539,7 +583,7 @@ int SNICClass::socketSetStatus(uint8_t socketId, uint8_t status) {
   return SNIC_COMMAND_ERROR;
 }
 
-int SNICClass::socketAvailable(uint8_t socketId) {
+int SNICClass::socketAvailable(int socketId) {
   // Think
   for (int i = 0; i < SNIC_MAX_SOCKET_NUM; i++) {
     if ((socket[i].socketId == socketId) && (socket[i].status == SNIC_SOCKET_STATUS_CONNECTED)) {
@@ -549,7 +593,7 @@ int SNICClass::socketAvailable(uint8_t socketId) {
   return SNIC_COMMAND_ERROR;
 }
 
-int SNICClass::socketReadChar(uint8_t socketId, uint8_t peek) {
+int SNICClass::socketReadChar(int socketId, uint8_t peek) {
   for (int i = 0; i < SNIC_MAX_SOCKET_NUM; i++) {
     if ((socket[i].socketId == socketId) && (socket[i].status == SNIC_SOCKET_STATUS_CONNECTED)) {
       if (socket[i].head == socket[i].tail) {
@@ -570,11 +614,10 @@ int SNICClass::socketReadChar(uint8_t socketId, uint8_t peek) {
   return SNIC_COMMAND_ERROR;
 }
 
-int SNICClass::socketWriteChar(uint8_t socketId, uint8_t c) {
+int SNICClass::socketWriteChar(int socketId, uint8_t c) {
   for (int i = 0; i < SNIC_MAX_SOCKET_NUM; i++) {
     if ((socket[i].socketId == socketId) && (socket[i].status == SNIC_SOCKET_STATUS_CONNECTED)) {
       int nextHead = (socket[i].head + 1) % SNIC_SOCKET_BUFFER_SIZE;
-
       if (nextHead != socket[i].tail) {
         socket[i].buffer[socket[i].head] = c;
         socket[i].head = nextHead;
@@ -587,7 +630,7 @@ int SNICClass::socketWriteChar(uint8_t socketId, uint8_t c) {
   return SNIC_COMMAND_ERROR;
 }
 
-int SNICClass::socketFlush(uint8_t socketId) {
+int SNICClass::socketFlush(int socketId) {
   for (int i = 0; i < SNIC_MAX_SOCKET_NUM; i++) {
     if ((socket[i].socketId == socketId) && (socket[i].status == SNIC_SOCKET_STATUS_CONNECTED)) {
       socket[i].head = socket[i].tail = 0;
