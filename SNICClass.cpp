@@ -408,7 +408,6 @@ void SNICClass::snicConnectionRecv() {
   }
 }
 
-
 int SNICClass::ack() {
   // This function may called from within interrupt handler.
   // So do not use sendBuffer or sendBuffer would be corrupted.
@@ -431,6 +430,15 @@ int SNICClass::accept(uint8_t listeningSocketId, uint8_t *clientSocketId) {
   return SNIC_COMMAND_ERROR;
 }
 
+int SNICClass::select(uint8_t listeningSocketId, uint8_t *clientSocketId) {
+  for (int i = 0; i < SNIC_MAX_SOCKET_NUM; i++) {
+    if ((socket[i].parentSocketId == listeningSocketId) && (socket[i].status == SNIC_SOCKET_STATUS_CONNECTED)) {
+      *clientSocketId = socket[i].socketId;
+      return SNIC_COMMAND_SUCCESS;
+    }
+  }
+  return SNIC_COMMAND_ERROR;
+}
 
 int SNICClass::sendRequest(uint8_t commandId, uint8_t subCommandId, uint16_t dataLength) {
   uint8_t checksum = 0;

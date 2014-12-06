@@ -68,6 +68,7 @@ class SNICClass {
     
     // Server Side Functions
     int accept(uint8_t listeningSocketId, uint8_t *clientSocketId);
+    int select(uint8_t listeningSocketId, uint8_t *clientSocketId);
 
     // Socket Operation Functions
     int socketsReset();

@@ -1,9 +1,11 @@
-#include <Arduino.h>
-#include "SNICClass.h"
 #include "SNICEthernetClient.h."
 
 SNICEthernetClient::SNICEthernetClient() {
+  this->socketId = -1;
+}
 
+SNICEthernetClient::SNICEthernetClient(uint8_t socketId) {
+  this->socketId = socketId;
 }
 
 int SNICEthernetClient::connect(IPAddress ip, uint16_t port) {
@@ -14,9 +16,7 @@ int SNICEthernetClient::connect(IPAddress ip, uint16_t port) {
     ipAddress[i] = ip[i];
   }
 
-  if ((SNIC.snicTcpCreateSocket(&socketId)  == SNIC_SUCCESS)) {
-    Serial.println("CreateSocket OK");
-  } else {
+  if ((SNIC.snicTcpCreateSocket(&socketId)  != SNIC_SUCCESS)) {
     return 0;
   }
 
@@ -35,8 +35,8 @@ int SNICEthernetClient::connect(const char *host, uint16_t port) {
   return connect(ip, port);
 }
 
-size_t SNICEthernetClient::write(uint8_t b) {
-  return write(&b, 1);
+size_t SNICEthernetClient::write(uint8_t c) {
+  return write(&c, 1);
 }
 
 size_t SNICEthernetClient::write(const uint8_t *buf, size_t size) {
