@@ -11,7 +11,7 @@ SNICEthernetClient SNICEthernetServer::available() {
     SNICEthernetClient client(clientSocketId);
     return client;
   }
-  
+
   return NULL;
 }
 

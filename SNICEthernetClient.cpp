@@ -1,7 +1,9 @@
+#include <Arduino.h>
+#include "SNICClass.h"
 #include "SNICEthernetClient.h."
 
 SNICEthernetClient::SNICEthernetClient() {
-  this->socketId = -1;
+
 }
 
 SNICEthernetClient::SNICEthernetClient(uint8_t socketId) {
@@ -16,10 +18,16 @@ int SNICEthernetClient::connect(IPAddress ip, uint16_t port) {
     ipAddress[i] = ip[i];
   }
 
-  if ((SNIC.snicTcpCreateSocket((uint8_t *)&socketId)  != SNIC_SUCCESS)) {
+  if ((SNIC.snicTcpCreateSocket((uint8_t *)&socketId) != SNIC_SUCCESS)) {
     return 0;
   }
-
+#if 0
+  if ((SNIC.snicTcpCreateSocket((uint8_t *)&socketId)  == SNIC_SUCCESS)) {
+    Serial.println("CreateSocket OK");
+  } else {
+    return 0;
+  }
+#endif
   int retval = SNIC.snicTcpConnectToServer(socketId, ipAddress, port, 60, &bytes);
   if ((retval == SNIC_SUCCESS) || (retval == SNIC_COMMAND_PENDING)) {
     return 1;
@@ -35,8 +43,8 @@ int SNICEthernetClient::connect(const char *host, uint16_t port) {
   return connect(ip, port);
 }
 
-size_t SNICEthernetClient::write(uint8_t c) {
-  return write(&c, 1);
+size_t SNICEthernetClient::write(uint8_t b) {
+  return write(&b, 1);
 }
 
 size_t SNICEthernetClient::write(const uint8_t *buf, size_t size) {
@@ -46,7 +54,7 @@ size_t SNICEthernetClient::write(const uint8_t *buf, size_t size) {
 }
 
 int SNICEthernetClient::available() {
-  int n = SNIC.socketAvailable(socketId);
+  int n = SNIC.socketReadable(socketId);
   
   if (n > 0) {
     return n;
@@ -98,5 +106,6 @@ SNICEthernetClient::operator bool() {
 }
 
 bool SNICEthernetClient::operator==(const SNICEthernetClient& rhs) {
-  return (socketId == rhs.socketId) && (socketId != -1) && (rhs.socketId != -1);
+  return socketId == rhs.socketId && socketId != -1 && rhs.socketId != -1;
 }
+

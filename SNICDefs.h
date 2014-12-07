@@ -89,9 +89,10 @@
 #define SNIC_MAX_UDP_SOCKET_NUM 4
 #define SNIC_MAX_SOCKET_NUM (SNIC_MAX_TCP_SOCKET_NUM + SNIC_MAX_UDP_SOCKET_NUM)
 
-#define SNIC_SEND_BUFFER_SIZE           128  // Buffer to keep data to snic.
-#define SNIC_RECEIVE_BUFFER_SIZE        128  // Buffer to keep data from snic for each socket.
-#define SNIC_SOCKET_BUFFER_SIZE          64  // Buffer to keep received data for each socket.
+#define SNIC_SEND_BUFFER_SIZE                128  // Buffer to keep data to snic.
+#define SNIC_RECEIVE_BUFFER_SIZE             128  // Buffer to keep data from snic for each socket.
+#define SNIC_SOCKET_BUFFER_SIZE               64  // Buffer to keep received data for each socket.
+#define SNIC_SOCKET_BUFFER_NOTIFICATION_SIZE  63  // Buffer size to tell SNIC.
 
 #define SNIC_COMMAND_RECEIVING 0
 #define SNIC_COMMNAD_RECEIVIED 1

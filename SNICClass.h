@@ -77,7 +77,7 @@ class SNICClass {
     int socketSetInformation(int socketId, int parentSocketId, uint8_t status, uint8_t protocol);
     int socketGetStatus(int socketId);
     int socketSetStatus(int socketId, uint8_t status);
-    int socketAvailable(int socketId);
+    int socketReadable(int socketId);
     int socketReadChar(int socketId, uint8_t peek = 0);
     int socketWriteChar(int socketId, uint8_t c);
     int socketsWritable();
