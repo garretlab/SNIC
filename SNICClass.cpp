@@ -394,13 +394,13 @@ void SNICClass::snicConnectionRecv() {
   for (int i = 0; i < payloadLength; i++) {
     socketWriteChar(socketId, receiveBuffer[i + 9]);
   }
-  /*
+
   if (socketsWritable()) {
     ack();
   } else {
     needAck = 1;
   }
-  */
+
   needAck = 1;
 }
 
@@ -593,7 +593,7 @@ int SNICClass::socketReadable(int socketId) {
   // Think
   for (int i = 0; i < SNIC_MAX_SOCKET_NUM; i++) {
     if ((socket[i].socketId == socketId) && (socket[i].status == SNIC_SOCKET_STATUS_CONNECTED)) {
-      return (SNIC_SOCKET_BUFFER_SIZE + socket[i].head - socket[i].tail) % SNIC_SOCKET_BUFFER_SIZE;
+      return (SNIC_SOCKET_BUFFER_SIZE + socket[i].tail - socket[i].head) % SNIC_SOCKET_BUFFER_SIZE;
     }
   }
 
@@ -601,10 +601,14 @@ int SNICClass::socketReadable(int socketId) {
 }
 
 int SNICClass::socketReadChar(int socketId, uint8_t peek) {
+  int ret = SNIC_COMMAND_ERROR;
+  
+  noInterrupts();
   for (int i = 0; i < SNIC_MAX_SOCKET_NUM; i++) {
     if ((socket[i].socketId == socketId) && (socket[i].status == SNIC_SOCKET_STATUS_CONNECTED)) {
       if (socket[i].head == socket[i].tail) {
-        return SNIC_COMMAND_ERROR;
+        ret = SNIC_COMMAND_ERROR;
+        break;
       } else {
         uint8_t c = socket[i].buffer[socket[i].tail];
         if (!peek) {
@@ -614,26 +618,50 @@ int SNICClass::socketReadChar(int socketId, uint8_t peek) {
             ack();
           }
         }
-        return c;
+        ret = c;
+        break;
       }
     }
   }
-  return SNIC_COMMAND_ERROR;
+  interrupts();
+  return ret;
+}
+
+int SNICClass::socketsWritable() {
+  for (int i = 0; i < SNIC_MAX_SOCKET_NUM; i++) {
+    if (socket[i].status == SNIC_SOCKET_STATUS_CONNECTED) {
+      int bufferFree;
+      char buf[64];
+
+      bufferFree = (SNIC_SOCKET_BUFFER_SIZE + socket[i].tail - socket[i].head - 1) % SNIC_SOCKET_BUFFER_SIZE;
+      if (bufferFree < SNIC_SOCKET_BUFFER_NOTIFICATION_SIZE) {
+        return 0;
+      }
+    }
+  }
+  return 1;
 }
 
 int SNICClass::socketWriteChar(int socketId, uint8_t c) {
+  int ret = SNIC_COMMAND_ERROR;
+  noInterrupts();
   for (int i = 0; i < SNIC_MAX_SOCKET_NUM; i++) {
     if ((socket[i].socketId == socketId) && (socket[i].status == SNIC_SOCKET_STATUS_CONNECTED)) {
       int nextHead = (socket[i].head + 1) % SNIC_SOCKET_BUFFER_SIZE;
       if (nextHead != socket[i].tail) {
         socket[i].buffer[socket[i].head] = c;
         socket[i].head = nextHead;
-        return SNIC_COMMAND_SUCCESS;
+        interrupts();
+        ret = SNIC_COMMAND_SUCCESS;
+        break;
       } else {
-        return -2;
+        interrupts();
+        ret = -2;
+        break;
       }
     }
   }
+  interrupts();
   return SNIC_COMMAND_ERROR;
 }
 
@@ -645,21 +673,6 @@ int SNICClass::socketFlush(int socketId) {
     }
   }
   return SNIC_COMMAND_ERROR;
-}
-
-int SNICClass::socketsWritable() {
-  for (int i = 0; i < SNIC_MAX_SOCKET_NUM; i++) {
-    if (socket[i].status == SNIC_SOCKET_STATUS_CONNECTED) {
-      int bufferFree;
-      char buf[64];
-
-      bufferFree = SNIC_SOCKET_BUFFER_SIZE - ((SNIC_SOCKET_BUFFER_SIZE + socket[i].head - socket[i].tail) % SNIC_SOCKET_BUFFER_SIZE) - 1;
-      if (bufferFree < SNIC_SOCKET_BUFFER_NOTIFICATION_SIZE) {
-        return 0;
-      }
-    }
-  }
-  return 1;
 }
 
 void SNICClass::uartHandler() {

@@ -79,8 +79,8 @@ class SNICClass {
     int socketSetStatus(int socketId, uint8_t status);
     int socketReadable(int socketId);
     int socketReadChar(int socketId, uint8_t peek = 0);
-    int socketWriteChar(int socketId, uint8_t c);
     int socketsWritable();
+    int socketWriteChar(int socketId, uint8_t c);
     int socketFlush(int socketId);
     
     void uartHandler();
