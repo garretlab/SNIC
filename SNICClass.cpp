@@ -171,7 +171,7 @@ int SNICClass::snicSocketPartialClose(uint8_t socketId, uint8_t direction, unsig
   }
 }
 
-int SNICClass::snicGetDhcpInfo(uint8_t interface, snicGetDhcpInfoResponse_t * response, unsigned long timeout) {
+int SNICClass::snicGetDhcpInfo(uint8_t interface, snicGetDhcpInfoResponse_t *response, unsigned long timeout) {
   sendBuffer.frame.snicGetDhcpInfo.interface = interface;
 
   sendRequest(SNIC_CMD_ID_SNIC, SNIC_GET_DHCP_INFO_REQ, sizeof(sendBuffer.frame.snicGetDhcpInfo));
@@ -190,7 +190,7 @@ int SNICClass::snicGetDhcpInfo(uint8_t interface, snicGetDhcpInfoResponse_t * re
   }
 }
 
-int SNICClass::snicResolveName(uint8_t interface, char * hostname, uint8_t * ipAddress, unsigned long timeout) {
+int SNICClass::snicResolveName(uint8_t interface, char *hostname, uint8_t *ipAddress, unsigned long timeout) {
   uint8_t hostnameLength = strlen(hostname);
 
   sendBuffer.frame.snicResolveName.interface = interface;
@@ -222,7 +222,7 @@ int SNICClass::snicIpConfig(uint8_t interface, unsigned long timeout) {
   }
 }
 
-int SNICClass::snicIpConfig(uint8_t interface, uint8_t * localhost, uint8_t * netmask, uint8_t * gateway, unsigned long timeout) {
+int SNICClass::snicIpConfig(uint8_t interface, uint8_t *localhost, uint8_t *netmask, uint8_t *gateway, unsigned long timeout) {
   sendBuffer.frame.snicIpConfig.interface = interface;
   sendBuffer.frame.snicIpConfig.dhcp = 0;
   for (int i = 0; i < 4; i++) {
@@ -254,7 +254,7 @@ int SNICClass::snicDataIndAckConfig(uint8_t protocol, uint8_t ackEnable, uint16_
   }
 }
 
-int SNICClass::snicTcpCreateSocket(uint8_t * socketId, unsigned long timeout) {
+int SNICClass::snicTcpCreateSocket(uint8_t *socketId, unsigned long timeout) {
   sendBuffer.frame.snicTcpCreateSocket.bind = 0;
 
   sendRequest(SNIC_CMD_ID_SNIC, SNIC_TCP_CREATE_SOCKET_REQ, 1);
@@ -328,7 +328,7 @@ int SNICClass::snicTcpCreateConnection(uint8_t socketId, uint16_t receiveBufferS
   }
 }
 
-int SNICClass::snicTcpConnectToServer(uint8_t socketId, uint8_t * server, uint16_t port, uint8_t connectTimeout, uint16_t * receiveBufferSize, unsigned long timeout) {
+int SNICClass::snicTcpConnectToServer(uint8_t socketId, uint8_t *server, uint16_t port, uint8_t connectTimeout, uint16_t *receiveBufferSize, unsigned long timeout) {
   sendBuffer.frame.snicTcpConnectToServer.socketId = socketId;
   for (int i = 0; i < 4; i++) {
     sendBuffer.frame.snicTcpConnectToServer.serverIpAddress[i] = server[i];
@@ -354,6 +354,29 @@ int SNICClass::snicTcpConnectToServer(uint8_t socketId, uint8_t * server, uint16
     }
     return commandReturn.status;
   } else {
+    return SNIC_COMMAND_ERROR;
+  }
+}
+
+int SNICClass::snicUdpCreateSocket(uint8_t *socketId, unsigned long timeout) {
+  sendBuffer.frame.snicUdpCreateSocket.bind = 0;
+
+  sendRequest(SNIC_CMD_ID_SNIC, SNIC_UDP_CREATE_SOCKET_REQ, 1);
+  if (waitFor(SNIC_CMD_ID_SNIC, SNIC_UDP_CREATE_SOCKET_REQ, timeout) == 0) {
+    if (commandReturn.status == SNIC_SUCCESS) {
+      // dumpBuffer(20);
+      *socketId = commandReturn.buffer[7];
+      if (socketAllocate(*socketId, -1, SNIC_SOCKET_STATUS_CREATED, SNIC_SOCKET_PROTOCOL_UDP) == SNIC_COMMAND_SUCCESS) {
+        return SNIC_COMMAND_SUCCESS;
+      } else {
+        // command success but no slot. should never happen.
+        snicCloseSocket(*socketId);
+        return SNIC_COMMAND_ERROR;
+      }
+    } else { // command failure.
+      return commandReturn.status;
+    }
+  } else { // timeout
     return SNIC_COMMAND_ERROR;
   }
 }
@@ -602,7 +625,7 @@ int SNICClass::socketReadable(int socketId) {
 
 int SNICClass::socketReadChar(int socketId, uint8_t peek) {
   int ret = SNIC_COMMAND_ERROR;
-  
+
   noInterrupts();
   for (int i = 0; i < SNIC_MAX_SOCKET_NUM; i++) {
     if ((socket[i].socketId == socketId) && (socket[i].status == SNIC_SOCKET_STATUS_CONNECTED)) {

@@ -59,6 +59,7 @@ class SNICClass {
     int snicTcpCreateSocket(uint16_t localPort, uint8_t *socketId, unsigned long timeout = 0);
     int snicTcpCreateConnection(uint8_t socketId, uint16_t receiveBufferSize, uint8_t maximumClientConnctions, snicTcpConnectToServerResponse_t *response, unsigned long timeout = 0);
     int snicTcpConnectToServer(uint8_t socketId, uint8_t *server, uint16_t port, uint8_t connectTimeout, uint16_t *receiveBufferSize, unsigned long timeout = 0);
+    int snicUdpCreateSocket(uint8_t *socketId, unsigned long timeout = 0);
     void snicTcpConnectionStatus();
     void snicTcpClientSocket();
     void snicConnectionRecv();

@@ -13,8 +13,8 @@ class SNICEthernetServer : public Server {
     SNICEthernetServer(uint16_t port);                        // done
     SNICEthernetClient available();                           // done
     virtual void begin();                                     // done
-    virtual size_t write(uint8_t c);                          // 
-    virtual size_t write(const uint8_t *buf, size_t size);    
+    virtual size_t write(uint8_t c);                          // done
+    virtual size_t write(const uint8_t *buf, size_t size);    // done
     using Print::write;
   private:
     uint16_t port;

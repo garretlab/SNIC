@@ -53,6 +53,7 @@
 #define SNIC_TCP_CREATE_SOCKET_REQ         0x10    // Create TCP socket
 #define SNIC_TCP_CREATE_CONNECTION_REQ     0x11    // Create TCP connection server
 #define SNIC_TCP_CONNECT_TO_SERVER_REQ     0x12    // Connect to TCP server
+#define SNIC_UDP_CREATE_SOCKET_REQ         0x13    // Create UDP socket
 #define SNIC_TCP_CONNECTION_STATUS_IND     0x20    // Connection status indication
 #define SNIC_TCP_CLIENT_SOCKET_IND         0x21    // TCP client socket indication
 #define SNIC_CONNECTION_RECV_IND           0x22    // TCP or connected UDP packet received indication
@@ -176,6 +177,11 @@ typedef union {
         uint8_t receiveBufferSize[2];
         uint8_t connectTimeout;
       } snicTcpConnectToServer;
+      struct {
+        uint8_t bind;
+        uint8_t localIpAddress[4];
+        uint8_t localPort[2];
+      } snicUdpCreateSocket;
       struct {
         uint8_t interface;
         uint8_t dhcp;
