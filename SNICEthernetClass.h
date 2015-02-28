@@ -9,7 +9,7 @@ class SNICEthernetClass {
   public:
     SNICEthernetClass();
     int begin(Stream *serialPort, char *accessPoint, uint8_t securityMode, char *key);
-    int begin(Stream *serialPort, char *accessPoint, uint8_t securityMode, char *key, IPAddress ip, IPAddress gateway, IPAddress subnet);
+    void begin(Stream *serialPort, char *accessPoint, uint8_t securityMode, char *key, IPAddress ip, IPAddress gateway, IPAddress subnet);
     IPAddress localIP();
     IPAddress subnetMask();
     IPAddress gatewayIP();
