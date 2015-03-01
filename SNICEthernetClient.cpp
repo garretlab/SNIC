@@ -21,13 +21,7 @@ int SNICEthernetClient::connect(IPAddress ip, uint16_t port) {
   if ((SNIC.snicTcpCreateSocket((uint8_t *)&socketId) != SNIC_SUCCESS)) {
     return 0;
   }
-#if 0
-  if ((SNIC.snicTcpCreateSocket((uint8_t *)&socketId)  == SNIC_SUCCESS)) {
-    Serial.println("CreateSocket OK");
-  } else {
-    return 0;
-  }
-#endif
+
   int retval = SNIC.snicTcpConnectToServer(socketId, ipAddress, port, 60, &bytes);
   if ((retval == SNIC_SUCCESS) || (retval == SNIC_COMMAND_PENDING)) {
     return 1;

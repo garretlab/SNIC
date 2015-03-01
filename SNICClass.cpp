@@ -93,7 +93,7 @@ int SNICClass::wifiGetStatus(uint8_t interface, wifiGetStatusResponse_t *respons
         case STA_JOINED:
         case AP_STARTED:
           strcpy((char *)response->ssid, (const char *)commandReturn.buffer[11]);
-          // Fall through
+        // Fall through
         case NO_NETWORK:
           for (int i = 0; i < 6; i++) {
             response->macAddress[i] = commandReturn.buffer[i + 7];
@@ -113,7 +113,7 @@ int SNICClass::snicInit(snicInitResponse_t *response, unsigned long timeout) {
 
   sendRequest(SNIC_CMD_ID_SNIC, SNIC_INIT_REQ, sizeof(sendBuffer.frame.snicInit));
   if (waitFor(SNIC_CMD_ID_SNIC, SNIC_INIT_REQ, timeout) == 0) {
-  if (response && (commandReturn.status == SNIC_SUCCESS)) {
+    if (response && (commandReturn.status == SNIC_SUCCESS)) {
       response->receiveBufferSize = commandReturn.buffer[7] << 8 | commandReturn.buffer[8];
       response->numberOfUdpSockets = commandReturn.buffer[9];
       response->numberOfTcpSockets = commandReturn.buffer[10];
@@ -348,7 +348,7 @@ int SNICClass::snicTcpConnectToServer(uint8_t socketId, uint8_t * server, uint16
         break;
       case SNIC_COMMAND_PENDING:
         while (socketGetStatus(socketId) == SNIC_SOCKET_STATUS_CREATED) {
-          ;
+          processSerial();
         }
         break;
     }
@@ -405,8 +405,6 @@ void SNICClass::snicConnectionRecv() {
 }
 
 int SNICClass::ack() {
-  // This function may called from within interrupt handler.
-  // So do not use sendBuffer or sendBuffer would be corrupted.
   serialPort->write(0x02);
   serialPort->write(0x80);
   serialPort->write(0x80);
@@ -460,12 +458,30 @@ int SNICClass::sendRequest(uint8_t commandId, uint8_t subCommandId, uint16_t dat
   return payloadLength + 6;
 }
 
+#if 0
 int SNICClass::waitFor(uint8_t commandId, uint8_t subCommandId, unsigned long timeout) {
   unsigned long waitUntil = millis() + timeout;
 
   while ((commandStatus == SNIC_COMMAND_RECEIVING) ||
          ((commandReturn.commandId & 0x7f) != commandId) ||
          ((commandReturn.subCommandId & 0x7f) != subCommandId)) {
+    if (timeout && (waitUntil < millis())) {
+      return SNIC_COMMAND_ERROR;
+    }
+  }
+
+  return 0;
+}
+#endif
+
+int SNICClass::waitFor(uint8_t commandId, uint8_t subCommandId, unsigned long timeout) {
+  unsigned long waitUntil = millis() + timeout;
+
+  while ((commandStatus == SNIC_COMMAND_RECEIVING) ||
+         ((commandReturn.commandId & 0x7f) != commandId) ||
+         ((commandReturn.subCommandId & 0x7f) != subCommandId)) {
+
+    processSerial();
     if (timeout && (waitUntil < millis())) {
       return SNIC_COMMAND_ERROR;
     }
@@ -588,6 +604,9 @@ int SNICClass::socketSetStatus(int socketId, uint8_t status) {
 }
 
 int SNICClass::socketReadable(int socketId) {
+  while (serialPort->available() > 0) {
+    storeChar(serialPort->read());
+  }
   // Think
   for (int i = 0; i < SNIC_MAX_SOCKET_NUM; i++) {
     if ((socket[i].socketId == socketId) && (socket[i].status == SNIC_SOCKET_STATUS_CONNECTED)) {
@@ -601,7 +620,10 @@ int SNICClass::socketReadable(int socketId) {
 int SNICClass::socketReadChar(int socketId, uint8_t peek) {
   int ret = SNIC_COMMAND_ERROR;
   
-  noInterrupts();
+  while (serialPort->available() > 0) {
+    storeChar(serialPort->read());
+  }
+
   for (int i = 0; i < SNIC_MAX_SOCKET_NUM; i++) {
     if ((socket[i].socketId == socketId) && (socket[i].status == SNIC_SOCKET_STATUS_CONNECTED)) {
       if (socket[i].head == socket[i].tail) {
@@ -621,7 +643,6 @@ int SNICClass::socketReadChar(int socketId, uint8_t peek) {
       }
     }
   }
-  interrupts();
   return ret;
 }
 
@@ -642,24 +663,20 @@ int SNICClass::socketsWritable() {
 
 int SNICClass::socketWriteChar(int socketId, uint8_t c) {
   int ret = SNIC_COMMAND_ERROR;
-  noInterrupts();
   for (int i = 0; i < SNIC_MAX_SOCKET_NUM; i++) {
     if ((socket[i].socketId == socketId) && (socket[i].status == SNIC_SOCKET_STATUS_CONNECTED)) {
       int nextHead = (socket[i].head + 1) % SNIC_SOCKET_BUFFER_SIZE;
       if (nextHead != socket[i].tail) {
         socket[i].buffer[socket[i].head] = c;
         socket[i].head = nextHead;
-        interrupts();
         ret = SNIC_COMMAND_SUCCESS;
         break;
       } else {
-        interrupts();
         ret = -2;
         break;
       }
     }
   }
-  interrupts();
   return SNIC_COMMAND_ERROR;
 }
 
@@ -672,60 +689,11 @@ int SNICClass::socketFlush(int socketId) {
   }
   return SNIC_COMMAND_ERROR;
 }
-#if 0
-void SNICClass::uartHandler() {
-  uint32_t status = USART0->US_CSR;
 
-  // Did we receive data ?
-  if ((status & US_CSR_RXRDY) == US_CSR_RXRDY) {
-    SNIC.storeChar(USART0->US_RHR);
+void SNICClass::processSerial() {
+  while (serialPort->available() > 0) {
+    storeChar(serialPort->read());
   }
-
-  // Acknowledge errors
-  if ((status & US_CSR_OVRE) == US_CSR_OVRE ||
-      (status & US_CSR_FRAME) == US_CSR_FRAME)
-  {
-    // TODO: error reporting outside ISR
-    USART0->US_CR |= US_CR_RSTSTA;
-  }
-}
-#endif
-
-void SNICClass::usartHandler( void ) {
-  Uart *_pUart = ((Uart *)USART0);
-  extern RingBuffer tx_buffer2;
-  RingBuffer *_tx_buffer = &tx_buffer2;
-  uint32_t status = _pUart->UART_SR;
-
-  // Did we receive data?
-  if ((status & UART_SR_RXRDY) == UART_SR_RXRDY)
-    SNIC.storeChar(_pUart->UART_RHR);
-
-  // Do we need to keep sending data?
-  if ((status & UART_SR_TXRDY) == UART_SR_TXRDY) 
-  {
-    if (_tx_buffer->_iTail != _tx_buffer->_iHead) {
-      _pUart->UART_THR = _tx_buffer->_aucBuffer[_tx_buffer->_iTail];
-      _tx_buffer->_iTail = (unsigned int)(_tx_buffer->_iTail + 1) % SERIAL_BUFFER_SIZE;
-    }
-    else
-    {
-      // Mask off transmit interrupt so we don't get it anymore
-      _pUart->UART_IDR = UART_IDR_TXRDY;
-    }
-  }
-
-  // Acknowledge errors
-  if ((status & UART_SR_OVRE) == UART_SR_OVRE || (status & UART_SR_FRAME) == UART_SR_FRAME)
-  {
-    // TODO: error reporting outside ISR
-    _pUart->UART_CR |= UART_CR_RSTSTA;
-  }
-}
-
-void USART0_Handler(void)
-{
-  SNIC.usartHandler();
 }
 
 SNICClass SNIC;

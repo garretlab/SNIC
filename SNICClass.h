@@ -83,7 +83,8 @@ class SNICClass {
     int socketWriteChar(int socketId, uint8_t c);
     int socketFlush(int socketId);
     
-    void usartHandler();
+    // Serial Operation Function
+    void processSerial();
 
     friend class SNICEthernetServer;
   private:
