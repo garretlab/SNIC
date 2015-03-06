@@ -24,8 +24,8 @@
  * port to Arduino.
  */
 
-#ifndef SCNICLASS_H
-#define SCNICLASS_H
+#ifndef SNIC_CLASS_H
+#define SNIC_CLASS_H
 
 #ifndef __SAM3X8E__
 #error "Not Arduino Due"
@@ -109,4 +109,4 @@ class SNICClass {
 
 extern SNICClass SNIC;
 
-#endif /* SCNICLASS_H */
+#endif /* SNIC_CLASS_H */

@@ -1,5 +1,5 @@
-#ifndef SNIC_EHTERNET_SERVER_H
-#define SNIC_EHTERNET_SERVER_H
+#ifndef SNIC_ETHERNET_SERVER_H
+#define SNIC_ETHERNET_SERVER_H
 
 #include <Arduino.h>
 #include <Server.h>
@@ -12,12 +12,12 @@ class SNICEthernetServer : public Server {
   public:
     SNICEthernetServer(uint16_t port);                        // done
     SNICEthernetClient available();                           // done
-    virtual void begin();                                     // done
-    virtual size_t write(uint8_t c);                          // done
-    virtual size_t write(const uint8_t *buf, size_t size);    // done
+    void begin();                                     // done
+    size_t write(uint8_t c);                          // done
+    size_t write(const uint8_t *buf, size_t size);    // done
     using Print::write;
   private:
     uint16_t port;
     int socketId;
 };
-#endif /* SNIC_EHTERNET_SERVER_H */
+#endif /* SNIC_ETHERNET_SERVER_H */

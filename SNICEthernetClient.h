@@ -1,5 +1,5 @@
-#ifndef SNIC_EHTERNET_CLIENT_H
-#define SNIC_EHTERNET_CLIENT_H
+#ifndef SNIC_ETHERNET_CLIENT_H
+#define SNIC_ETHERNET_CLIENT_H
 
 #include <Arduino.h>
 #include "SNICClass.h"
@@ -10,20 +10,20 @@ class SNICEthernetClient : public Client {
     SNICEthernetClient();                                    // done
     SNICEthernetClient(uint8_t socketId);                    // done
 
-    virtual int connect(IPAddress ip, uint16_t port);        // done
-    virtual int connect(const char *host, uint16_t port);    // done
-    virtual size_t write(uint8_t c);                         // done
-    virtual size_t write(const uint8_t *buf, size_t size);   // done
-    virtual int available();                                 // done
-    virtual int read();                                      // done
-    virtual int read(uint8_t *buf, size_t size);             // done
-    virtual int peek();                                      // done
-    virtual void flush();                                    // done
-    virtual void stop();                                     // done
-    virtual uint8_t connected();                             // done
-    virtual operator bool();                                 // done
-    virtual bool operator==(const SNICEthernetClient&);      // done
-    virtual bool operator!=(const SNICEthernetClient& rhs) {
+    int connect(IPAddress ip, uint16_t port);        // done
+    int connect(const char *host, uint16_t port);    // done
+    size_t write(uint8_t c);                         // done
+    size_t write(const uint8_t *buf, size_t size);   // done
+    int available();                                 // done
+    int read();                                      // done
+    int read(uint8_t *buf, size_t size);             // done
+    int peek();                                      // done
+    void flush();                                    // done
+    void stop();                                     // done
+    uint8_t connected();                             // done
+    operator bool();                                 // done
+    bool operator==(const SNICEthernetClient&);      // done
+    bool operator!=(const SNICEthernetClient& rhs) {
       return !this->operator==(rhs);
     };
 
@@ -32,4 +32,4 @@ class SNICEthernetClient : public Client {
     int socketId;
 };
 
-#endif /* SNIC_EHTERNET_CLIENT_H */
+#endif /* SNIC_ETHERNET_CLIENT_H */
